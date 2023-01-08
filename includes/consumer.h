@@ -15,9 +15,6 @@ typedef struct _AssemblyLoadUnloadRundown_V1
 } AssemblyLoadUnloadRundown_V1, *PAssemblyLoadUnloadRundown_V1;
 #pragma pack()
 
-// The CLR runtime provider GUID is e13c0d23-ccbc-4e12-931b-d9cc2eee27e4.
-static GUID ClrRuntimeProviderGuid = { 0xe13c0d23, 0xccbc, 0x4e12, { 0x93, 0x1b, 0xd9, 0xcc, 0x2e, 0xee, 0x27, 0xe4 } };
-
 // Print process name
 void __print_proc_name();
 // Check if pid exists

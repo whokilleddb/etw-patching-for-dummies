@@ -6,6 +6,7 @@
 #include <evntrace.h>
 #include <Evntcons.h>
 #include "consumer.h"
+#incude "providers.h"
 #pragma comment(lib, "advapi32.lib")
 
 // PID to monitor
@@ -127,14 +128,14 @@ void start_logger(){
 
     // Configure how an ETW event provider logs events to a trace session.
     result = EnableTraceEx(
-        &ClrRuntimeProviderGuid,    // CLR Runtime Provider
-        NULL,                       // No source identity is needed 
-        hTrace,                     // Handle of the event tracing session for which you are configuring the provider.
-        1,                          // Set to 1 to enable receiving events from the provider
-        TRACE_LEVEL_VERBOSE,        // 	Detailed diagnostic events
-        0x8,                        // LoaderKeyword
+        &MicrosoftWindowsDotNETRuntime,    // CLR Runtime Provider
+        NULL,                              // No source identity is needed 
+        hTrace,                            // Handle of the event tracing session for which you are configuring the provider.
+        1,                                 // Set to 1 to enable receiving events from the provider
+        TRACE_LEVEL_VERBOSE,               // 	Detailed diagnostic events
+        0x8,                               // LoaderKeyword
         0,
-        0,                          // No Special Behaviour
+        0,                                 // No Special Behaviour
         NULL
     );
 
@@ -168,7 +169,7 @@ void start_logger(){
 
 
 void main(int argc, char **argv){
-    printf("[i] ETW .NET Tracer\n");
+    printf("[i] Microsoft-Windows-DotNETRuntime Event Consumer - @whokilleddb\n");
 
     unsigned int pid;
     if (argc != 2){
@@ -176,16 +177,16 @@ void main(int argc, char **argv){
         fprintf(stderr, "[!] Usage: %s <PID>\n", argv[0]);
         exit(-1);
     }
-    
+
     PID = (unsigned int)atoi(argv[1]);
-    
+
     if (PID == 0){
         fprintf(stderr, "[!] Enter valid PID!\n");
         exit(-2);
     }
 
     printf("[i] Process PID\t\t%u\n", PID);
-    
+
     // Check if process with given PID exists
     if (check_pid()<0){
         exit(-3);
