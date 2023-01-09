@@ -6,7 +6,7 @@
 #include <evntrace.h>
 #include <Evntcons.h>
 #include "consumer.h"
-#incude "providers.h"
+#include "providers.h"
 #pragma comment(lib, "advapi32.lib")
 
 // PID to monitor
