@@ -11,33 +11,60 @@ So, when I started writing this blog, I had no idea what `.NET` really was. All 
 
 And to solve that question, I decided to do what all good devs would have done: write a _"Hello World"_ program in both styles.
 
-**(Normal)C++**
+**Native C++**
 ```cpp
+// helloworld.cpp
 #include <iostream>
+#include <thread>
+#include <chrono>
 using namespace std;
 
 int main() 
 {
     std::cout << "Hello, World!" << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(100));
     return 0;
 }
 ```
 **C++/CLI**
 ```cpp
+// helloworld_cli.cpp
 #using <mscorlib.dll>
 using namespace System;
+using namespace System::Threading;
 
-int main(array<System::String ^> ^args)
+int main()
 {
     Console::WriteLine("Hello, World!");
+    Thread::Sleep(100000);
     return 0;
 }
 ```
 Both of these can be compiled with `cl.exe` aka the `Visual Studio Compiler` as such:
 
 ```powershell
-> cl.exe helloworld.cpp
+> cl.exe helloworld.cpp /EHsc
+> cl.exe helloworld_cli.cpp /clr
 ```
+
+This should give us two binaries: `helloworld.exe` and `helloworld_cli.exe`, both of which print the same `"Hello, World!"` statement and then go to sleep. The sleep part is there to give us enough time to examine the process. 
+
+The first thing which I noticed was that the `C++/CLI` excutable was much smaller than the native `C++` executable.
+
+```bash
+10-01-2023  15:19           242,688 helloworld.exe
+10-01-2023  04:49            32,256 helloworld_cli.exe
+```
+This is becase when you compile a C++/CLI program, the resulting executable is actually a combination of native machine code and `managed code`.
+
+`Managed code` is code that runs under the control of the `.NET` runtime, which provides a number of services such as memory management, exception handling, and type safety (we would talk more about this later). Because the runtime provides these services, managed code does not need to include the same kind of infrastructure that is required for native code.
+
+As a result, `C++/CLI` executables are typically smaller in size than native `C++` executables. This is because they don't need to include memory management, exception handling and other related implementations themselves, which are provided by the runtime.
+
+Additionally, C++/CLI codes makes use of the `CLR` (another thing we would get to later) which is a part of the `.NET` Framework, this framework ships with the operating system, as such `C++/CLI` application does not require any additional runtime or library dependencies.
+
+That solves one mystery, but now coming to the main 
+
 
 ## Compilation
 To compile the sources, you can run the `compile.bat` script:
@@ -58,4 +85,4 @@ cl.exe /nologo /Ox /MT /W0 /GS- /DNDEBUG /I .\includes /Tc.\src\patcher.c /link 
 ## References
 - [Hiding Your .NET – ETW](https://www.mdsec.co.uk/2020/03/hiding-your-net-etw/)
 - [Cobalt Strike 3.11 – The snake that eats its tail](https://www.cobaltstrike.com/blog/cobalt-strike-3-11-the-snake-that-eats-its-tail/)
-- [Common Language Runtime #1: An Introduction](https://mez0.cc/posts/common-language-runtime-1/https://mez0.cc/posts/common-language-runtime-1/)
+- [Common Language Runtime #1: An Introduction](https://mez0.cc/posts/common-language-runtime-1)
