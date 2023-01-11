@@ -64,8 +64,10 @@ As a result, `C++/CLI` executables are typically smaller in size than native `C+
 Additionally, C++/CLI codes makes use of the `CLR` (another thing we would get to later) which is a part of the `.NET` Framework, this framework ships with the operating system, as such `C++/CLI` application does not require any additional runtime or library dependencies.
 
 Looking at each process in [Process Explorer](https://learn.microsoft.com/en-us/sysinternals/downloads/process-explorer), we see the following:
-![[helloworld_process_explorer.png]]
-![[helloworld_cli_process_explorer.png]]
+
+![](./img/helloworld_process_explorer.png?raw=True)
+
+![](./img/helloworld_cli_process_explorer.png)
 
 The first thing I noticed was that the `C++/CLI` executable has two extra tabs: 
 - `.NET Assemblies` - This feature allows you to view the `.NET` assemblies that are loaded in a specific process. The tab displays information such as the assembly name, version, and location, as well as the classes and methods that are present in each assembly. This information can be helpful for troubleshooting issues with `.NET` applications, as well as for understanding the internal workings of a process.
