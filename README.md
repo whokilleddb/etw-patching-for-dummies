@@ -83,6 +83,8 @@ First things first, notice the `CLR` version. We will talk about `CLR` later eit
 
 So, it's like a logical isolation. I like to think of it to be loosely akin to Linux `namespaces` but more dotnet-y. Moving on, we see another `AppDomain` by the name of `SharedDomain` in there with `mscorlib.dll`. I really like [The Moth's Explanation](http://www.danielmoth.com/Blog/mscorlibdll.aspx) of the name: ms(Microsoft)-cor(Common Object Runtime)-lib(Library) [yeah yeah its ms stands for multilingual standard now, but the original name makes more sense].  According to [this thread](https://social.msdn.microsoft.com/Forums/vstudio/en-US/92a0c975-e350-4d8d-af8e-36ec0ad6c95c/specific-purpose-of-mscorlib-dll-in-net?forum=clr) on microsoft's forums, this library contains the various namespace defintitions (so, much like kernel32/ntdll for normal programs?).
 
+![](./img/mscorlib_dotpeek.png)
+
 I believe this is a good introduction to the land of `.NET`, but before we talk further, we need to discuss about `CLR` and `Managed Code`.
 
 # The CLR: Common Language Runtime
@@ -108,6 +110,151 @@ It's important to note that, `MSIL` code is not executed directly by the hardwar
 Managed code in the .NET Framework refers to code that is executed by the Common Language Runtime (`CLR`) rather than directly by the computer's hardware. `Managed code` is written in a managed programming language, such as `C#` or `Visual Basic`, and it is compiled into an intermediate language called Microsoft Intermediate Language (MSIL). MSIL is a low-level programming language that is executed by the CLR at runtime, rather than being executed directly by the computer's hardware.
 
 -----
+
+Okay that was a lot of theory. Long story short, `.NET` code requires the `CLR` to run the `MSIL`, hence it is _"managed"_. Now here comes the next big question: **"Can we call managed code from an unmanaged process?"**. Well, turns out we can, but for that we need to manually load `CLR` into the process. Taking a page out of [Adam Chester's Blog](https://blog.xpnsec.com/hiding-your-dotnet-etw/) we write the following code to load a `CLR` instance into an unmanaged process.
+
+```c
+// Run managed code from the Unmanaged Land
+#include <stdio.h>
+#define CINTERFACE
+#define COBJMACROS
+
+#include <metahost.h>
+#include <Unknwnbase.h>
+#pragma comment(lib, "mscoree.lib")
+int main(){
+    HRESULT result;
+    
+    // Interface for interacting with the CLR
+    // https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/hosting/iclrmetahost-interface
+    ICLRMetaHost* pMetaHost = NULL;
+
+    // Create instance of CLR
+    // https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/hosting/clrcreateinstance-function
+    // Also note that the C and C++ versions of the same will be different
+    // https://stackoverflow.com/questions/1351589/error-c2440-function-cannot-convert-from-const-iid-to-dword
+    result = CLRCreateInstance(
+                &CLSID_CLRMetaHost,          // The CLSID_CLRMetaHost is used to create an instance of the CLRMetaHost class 
+                &IID_ICLRMetaHost,           // Corressponding RIID 
+                (LPVOID*)&pMetaHost);        // Interface
+
+    if (result != S_OK){
+        fprintf(stderr, "[!] CLRCreateInstance() function failed (0x%x)\n", result);
+        return -1;
+    }
+    printf("[i] Created CLR Instance\n");
+
+    // Enumerate installed CLR runtimes
+    IEnumUnknown * runtime = NULL;
+    result = ICLRMetaHost_EnumerateInstalledRuntimes(pMetaHost, &runtime);
+    if (result != S_OK){
+        fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
+        return -2;
+    }
+    printf("[i] Enumerated Runtimes\n"); 
+
+    // Iterate over runtimes
+    DWORD count;
+    IUnknown *unk;
+    WCHAR buf[MAX_PATH];
+    ICLRRuntimeInfo *runtimeinfo;
+    // result = IEnumUnknown_Next(
+    //     runtime, 
+    //     1,              // Number of elements to retrieve
+    //     &unk,           // Pointer to an array of IUnknown pointers that will receive the elements
+    //     &count);        // Pointer to a ULONG variable that will receive the number of elements actually retrieved.
+    while((result = IEnumUnknown_Next(runtime, 1, &unk, 0)) == S_OK){
+        // Obtain a pointer to another interface on an object. 
+        result = IUnknown_QueryInterface(
+                    unk,                     // Pointer to the IUnknown interface of the object being queried.
+                    &IID_ICLRRuntimeInfo,    
+                    (void**)&runtimeinfo);
+
+        count = MAX_PATH;
+        if (result == S_OK){
+            // Get Version String
+            result =  ICLRRuntimeInfo_GetVersionString(
+                runtimeinfo,
+                buf,
+                &count                
+            );
+            if (result == S_OK && count != 0) {
+                wprintf(L"[i] Found Runtime Version: %s\n", buf);
+            }
+            else {
+                fprintf(stderr, "[!] ICLRRuntimeInfo_GetVersionString() Failed (0x%x)\n", result);
+            }
+        }   
+        ICLRRuntimeInfo_Release(runtimeinfo);
+        IUnknown_Release(unk);
+        break;
+    }
+
+    // Get last supported runtime
+    ICLRRuntimeHost *runtimehost = NULL;
+    result = ICLRRuntimeInfo_GetInterface(
+        runtimeinfo,
+        &CLSID_CLRRuntimeHost, 
+        &IID_ICLRRuntimeHost, 
+        (LPVOID*)&runtimehost);
+    
+    if (result != S_OK){
+        fprintf(stderr, "[!] ICLRRuntimeInfo_GetInterface() function failed (0x%x)\n", result);
+        return -3;
+    }
+
+    // Check runtime
+    if (count != 0 && NULL == runtimehost){
+        fprintf(stderr, "[!] No Valid Runtime Found\n");
+        return -4;
+    }
+    wprintf(L"[i] Using Runtime: %s\n", buf);
+
+    // Start Runtime
+    printf("[i] Starting Runtime\n");
+    result =  ICLRRuntimeHost_Start(runtimehost);
+    if (result != S_OK){
+        fprintf(stderr, "[!] ICLRRuntimeHost_Start() function failed (0x%x)\n", result);
+        return -5;
+    }
+
+    printf("\n[i] Entering Land of Managed Code\n");
+    DWORD res = 0;
+    const LPCWSTR dll_path = L"C:\\Users\\whokilleddb\\Codes\\etw-patching-for-dummies\\misc\\helloworld.dll";
+    result = ICLRRuntimeHost_ExecuteInDefaultAppDomain(
+        runtimehost,
+        dll_path,
+        L"HelloWorld.Program",
+        L"EntryPoint",
+        L"Hello There(General Kenobi)",
+        &res
+    );
+    if (result != S_OK){
+        fprintf(stderr, "[!] ICLRRuntimeHost_ExecuteInDefaultAppDomain() function failed (0x%x)\n", result);
+        return -6;
+    }
+    printf("[i] Exit Code: %d\n", res);
+    printf("[i] Back to Unmanaged Land\n\n");
+
+    // Stop Runtime
+    printf("[i] Stopping Runtime\n");
+    result =  ICLRRuntimeHost_Stop(runtimehost);
+    if (result != S_OK){
+        fprintf(stderr, "[!] ICLRRuntimeHost_Stop() function failed (0x%x)\n", result);
+        return -6;
+    }
+
+
+
+    printf("[i] Performing Cleanup!\n");
+    IEnumUnknown_Release(runtime);
+    ICLRRuntimeInfo_Release(runtimeinfo);
+    ICLRRuntimeHost_Release(runtimehost);
+    ICLRMetaHost_Release(pMetaHost);
+    printf("[i] Cleanup Done!\n");
+    return 0;
+}
+```
 
 
 ## Compilation
