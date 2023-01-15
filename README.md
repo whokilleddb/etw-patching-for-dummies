@@ -210,6 +210,8 @@ int main(){
     }
     wprintf(L"[i] Using Runtime: %s\n", buf);
 
+	// Sleep(100000);
+	
     // Start Runtime
     printf("[i] Starting Runtime\n");
     result =  ICLRRuntimeHost_Start(runtimehost);
@@ -245,7 +247,6 @@ int main(){
     }
 
 
-
     printf("[i] Performing Cleanup!\n");
     IEnumUnknown_Release(runtime);
     ICLRRuntimeInfo_Release(runtimeinfo);
@@ -255,6 +256,10 @@ int main(){
     return 0;
 }
 ```
+
+One very interesting thing I noticed was if I open the process in `ProcessHacker`, right before the `CLR` runtime is started with the `ICLRRuntimeHost_Start()` function, the `.NET` tabs do not appear. However, as soon as the `CLR` host is up and running, the `.NET` tabs reappear again. *Interesting......*
+
+![](./img/loader_under_process_hacker.png)
 
 
 ## Compilation
