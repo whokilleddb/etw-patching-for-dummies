@@ -42,12 +42,13 @@ int main(){
     IUnknown *unk;
     WCHAR buf[MAX_PATH];
     ICLRRuntimeInfo *runtimeinfo;
-    // result = IEnumUnknown_Next(
-    //     runtime, 
-    //     1,              // Number of elements to retrieve
-    //     &unk,           // Pointer to an array of IUnknown pointers that will receive the elements
-    //     &count);        // Pointer to a ULONG variable that will receive the number of elements actually retrieved.
-    while((result = IEnumUnknown_Next(runtime, 1, &unk, 0)) == S_OK){
+    while((result = IEnumUnknown_Next(
+                        runtime,            
+                        1,                  // Number of elements to retrieve
+                        &unk,               // Pointer to an array of IUnknown pointers that will receive the elements
+                        0)                  // Pointer to a ULONG variable that will receive the number of elements actually retrieved.
+                    ) == S_OK){
+        
         // Obtain a pointer to another interface on an object. 
         result = IUnknown_QueryInterface(
                     unk,                     // Pointer to the IUnknown interface of the object being queried.
@@ -74,6 +75,14 @@ int main(){
         break;
     }
 
+    // Check if a specific version of the CLR is loadable on the current system
+    BOOL bLoadable;
+    ICLRRuntimeInfo_IsLoadable(runtimeinfo, &bLoadable);
+    if (bLoadable == FALSE){
+        fprintf(stderr, "[!] Specified version of CLR is not loadable\n");
+        return -7;
+    }
+
     // Get last supported runtime
     ICLRRuntimeHost *runtimehost = NULL;
     result = ICLRRuntimeInfo_GetInterface(
@@ -87,7 +96,7 @@ int main(){
         return -3;
     }
 
-    // Check runtime
+    // Check runtime host
     if (count != 0 && NULL == runtimehost){
         fprintf(stderr, "[!] No Valid Runtime Found\n");
         return -4;
@@ -110,11 +119,15 @@ int main(){
         dll_path,
         L"HelloWorld.Program",
         L"EntryPoint",
-        L"Hello There(General Kenobi)",
+        L"Hello There (General Kenobi)",
         &res
     );
+
     if (result != S_OK){
         fprintf(stderr, "[!] ICLRRuntimeHost_ExecuteInDefaultAppDomain() function failed (0x%x)\n", result);
+        if (result==0x80070002){
+            fprintf(stderr, "[!] The speicified .NET assembly could not be found\n");
+        }
         return -6;
     }
     printf("[i] Exit Code: %d\n", res);
@@ -127,8 +140,6 @@ int main(){
         fprintf(stderr, "[!] ICLRRuntimeHost_Stop() function failed (0x%x)\n", result);
         return -6;
     }
-
-
 
     printf("[i] Performing Cleanup!\n");
     IEnumUnknown_Release(runtime);
