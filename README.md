@@ -112,7 +112,15 @@ Managed code in the .NET Framework refers to code that is executed by the Common
 -----
 
 Okay that was a lot of theory. Long story short, `.NET` code requires the `CLR` to run the `MSIL`, hence it is _"managed"_. Now here comes the next big question: **"Can we call managed code from an unmanaged process?"**. Well, turns out we can, but for that we need to manually load `CLR` into the process. Taking a page out of [Adam Chester's Blog](https://blog.xpnsec.com/hiding-your-dotnet-etw/) we can write some code to load a `CLR` instance into an unmanaged process and call managed code from there.
-The code 
+The code can be found [here](https://github.com/whokilleddb/load-my-clr). Lets break it down. 
+
+There are four primary wrapper functions:
+- `GetCLRInterface`
+- `StartRuntime`
+- `RunAssembly`
+- `StopRuntime`
+
+These functions load the `CLR` into our unmanaged process, start the runtime, run the `.NET` code and then finally stop the runtime. 
 
 One very interesting thing I noticed was if I open the process in `ProcessHacker`, right before the `CLR` runtime is started with the `ICLRRuntimeHost_Start()` function, the `.NET` tabs do not appear. However, as soon as the `CLR` host is up and running, the `.NET` tabs reappear again. *Interesting......*
 
