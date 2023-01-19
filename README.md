@@ -140,8 +140,8 @@ Once we have our interface, we can use it to enumerate all installed Runtimes wt
 result = ICLRMetaHost_EnumerateInstalledRuntimes(metahost, &runtime);
 
 if (result != S_OK){
-	fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
-	return result;
+  fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
+  return result;
 }
 ```
 
@@ -194,8 +194,8 @@ This function is essentially a wrapper around the `ICLRRuntimeHost_Start` functi
 printf("[i] Starting Runtime\n");
 result = ICLRRuntimeHost_Start(runtimehost);
 if (result != S_OK){
-	fprintf(stderr, "[!] ICLRRuntimeHost_Start() function failed (0x%x)\n", result);
-	return result;
+  fprintf(stderr, "[!] ICLRRuntimeHost_Start() function failed (0x%x)\n", result);
+  return result;
 }
 ```
 
