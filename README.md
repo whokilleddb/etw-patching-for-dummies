@@ -6,7 +6,7 @@ When initially getting into ETW and patching it, I was not prepared for what was
 
 *PS: There will be a scramble of topics in no particular order, mostly discussing topics relevant to the cause.*
 
-## First-things-first: Show and Tell - The .NET FRAMEWORK
+## Show and Tell - The .NET FRAMEWORK
 So, when I started writing this blog, I had no idea what `.NET` really was. All knew was that its _some-sorta_ framework by Microsoft for doing windows stuff. Turns out, it is a framework for `C#` and a version of `C++` called `C++/CLI`, which can be compiled with `Visual C++` on Windows. Here, my first question was, *"Hey, then how is it different from normal C++ code?"* 
 
 And to solve that question, I decided to do what all good devs would have done: write a _"Hello World"_ program in both styles.
@@ -33,11 +33,10 @@ int main()
 using namespace System;
 using namespace System::Threading;
 
-int main()
-{
-    Console::WriteLine("Hello, World!");
-    Thread::Sleep(100000);
-    return 0;
+int main(){
+  Console::WriteLine("Hello, World!");
+  Thread::Sleep(100000);
+  return 0;
 }
 ```
 Both of these can be compiled with `cl.exe` aka the `Visual Studio Compiler` as such:
@@ -121,6 +120,132 @@ There are four primary wrapper functions:
 - `StopRuntime`
 
 These functions load the `CLR` into our unmanaged process, start the runtime, run the `.NET` code and then finally stop the runtime. 
+
+### `GetCLRInterface`
+
+First, we create a instance of the type `ICLRMetaHost` by calling the following the `CLRCreateInstance()` function as such:
+
+```c
+result = CLRCreateInstance(&CLSID_CLRMetaHost, &IID_ICLRMetaHost, (LPVOID*)&metahost);
+if (result != S_OK){
+  fprintf(stderr, "[!] CLRCreateInstance() function failed (0x%x)\n", result);
+  return result;
+}
+```
+
+This provides us with a `ICLRMetaHost` Interface which we can use to perfeorm a multitude of tasks like return a specific version of the common language runtime (CLR) based on its version number, list all installed CLRs, list all runtimes that are loaded in a specified process, discover the CLR version used to compile an assembly, exit a process with a clean runtime shutdown, and query legacy API binding, etc. Refer the official [docs](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/hosting/iclrmetahost-interface#methods) here!
+
+Once we have our interface, we can use it to enumerate all installed Runtimes wth:
+```c
+result = ICLRMetaHost_EnumerateInstalledRuntimes(metahost, &runtime);
+
+if (result != S_OK){
+	fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
+	return result;
+}
+```
+
+This returns an enumeration that contains a valid [ICLRRuntimeInfo](https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/hosting/iclrruntimeinfo-interface) interface for each version of the common language runtime (CLR) that is installed on a computer. We can go throught these entries and list all the available versions with:
+
+```c
+while((result = IEnumUnknown_Next(runtime, 1, &unk, 0)) == S_OK){
+  result = IUnknown_QueryInterface(unk, &IID_ICLRRuntimeInfo, (void**)&runtimeinfo);
+  count = MAX_PATH;
+  if (result == S_OK){
+    // Get Version String
+    result = ICLRRuntimeInfo_GetVersionString(runtimeinfo, buf, &count);
+    if (result == S_OK && count != 0) {
+      wprintf(L"[i] Found Runtime Version: %s\n", buf);
+    }
+    else {
+      fprintf(stderr, "[!] ICLRRuntimeInfo_GetVersionString() Failed (0x%x)\n", result);
+    }
+  }
+  IUnknown_Release(unk);
+  break;
+}
+```
+
+This should list all the available versions of the `CLR` to us. We just go for the last available version and if it can be loaded into the current system, we are good to go:
+
+```c
+// Get last supported runtime
+result = ICLRRuntimeInfo_GetInterface(runtimeinfo, &CLSID_CLRRuntimeHost, &IID_ICLRRuntimeHost, (LPVOID*)&runtimehost);
+
+if (result != S_OK){
+  fprintf(stderr, "[!] ICLRRuntimeInfo_GetInterface() function failed (0x%x)\n", result);
+  return result;
+}
+
+// Check runtime host
+if (count != 0 && NULL == runtimehost){
+  fprintf(stderr, "[!] No Valid Runtime Found\n");
+  return OLEOBJ_S_INVALIDHWND;
+}
+```
+
+If this is all good to go, we can then move onto the next step of the process, which is to actually start the `CLR`  into our current process.
+
+### `StartRuntime`
+
+This function is essentially a wrapper around the `ICLRRuntimeHost_Start` function, which is used to start the execution of the `CLR` in a process. It initializes the `CLR` and sets up the infrastructure needed for managed code execution. Once the `CLR` is started, it allows the process to load and execute assemblies that contain managed code.
+
+```c
+printf("[i] Starting Runtime\n");
+result = ICLRRuntimeHost_Start(runtimehost);
+if (result != S_OK){
+	fprintf(stderr, "[!] ICLRRuntimeHost_Start() function failed (0x%x)\n", result);
+	return result;
+}
+```
+
+This loads the `CLR` into our current process and at this point, we are good to run some managed code!
+
+### `RunAssembly`
+This is the part where we finally the run managed code with the `ICLRRuntimeHost_ExecuteInDefaultAppDomain` function. It takes in the path to the assembly, the name of the type in the format `Namespace.Class`, the name of the method to invoke, the string parameter to pass to the program and  variable to store the return code.
+
+```c
+result = ICLRRuntimeHost_ExecuteInDefaultAppDomain(runtimehost, assembly_path, namespace_class, function_name, cmd_arguments, &res);
+
+if (result != S_OK){
+	fprintf(stderr, "[!] ICLRRuntimeHost_ExecuteInDefaultAppDomain() function failed (0x%x)\n", result);
+	if (result==0x80070002){
+			fprintf(stderr, "[!] The speicified .NET assembly could not be found\n");
+}
+
+	return result;
+}
+```
+
+In our example, we invoke a very simple `MessageBox` program which displays the message we supplied as argument input as:
+
+```c
+RunAssembly(
+PROGRAM_PATH,
+L"HelloWorld.Program",
+L"EntryPoint",
+L"Hello There (General Kenobi)"
+)
+```
+
+![](./img/poc.png)
+
+### `StopRuntime`
+
+Finally, we use stop the execution of the code with the `ICLRRuntimeHost_Stop` method call.
+
+```c
+result = ICLRRuntimeHost_Stop(runtimehost);
+
+if (result != S_OK){
+	fprintf(stderr, "[!] ICLRRuntimeHost_Stop() function failed (0x%x)\n", result);\
+	return result;
+}
+```
+
+Finally, when everything is done, we call the `CleanUp` function and make sure we have released all the globals!
+
+-----
 
 One very interesting thing I noticed was if I open the process in `ProcessHacker`, right before the `CLR` runtime is started with the `ICLRRuntimeHost_Start()` function, the `.NET` tabs do not appear. However, as soon as the `CLR` host is up and running, the `.NET` tabs reappear again. *Interesting......*
 
