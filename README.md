@@ -140,8 +140,8 @@ Once we have our interface, we can use it to enumerate all installed Runtimes wt
 result = ICLRMetaHost_EnumerateInstalledRuntimes(metahost, &runtime);
 
 if (result != S_OK){
-  fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
-  return result;
+	fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
+	return result;
 }
 ```
 
@@ -194,8 +194,8 @@ This function is essentially a wrapper around the `ICLRRuntimeHost_Start` functi
 printf("[i] Starting Runtime\n");
 result = ICLRRuntimeHost_Start(runtimehost);
 if (result != S_OK){
-  fprintf(stderr, "[!] ICLRRuntimeHost_Start() function failed (0x%x)\n", result);
-  return result;
+	fprintf(stderr, "[!] ICLRRuntimeHost_Start() function failed (0x%x)\n", result);
+	return result;
 }
 ```
 
@@ -251,7 +251,10 @@ One very interesting thing I noticed was if I open the process in `ProcessHacker
 
 ![](./img/loader_under_process_hacker.png)
 
+One gaping problem in this project is that using this particular approach, we need the managed code to be run on the disk itself. A better way to do things would be to run things in-memory, but that's a problem for another time.
 
+## ETW: What the hell is even that?
+`Event Tracing For Windows`, aka ETW.
 ## Compilation
 To compile the sources, you can run the `compile.bat` script:
 ```powershell
