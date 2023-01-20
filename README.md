@@ -19,11 +19,10 @@ And to solve that question, I decided to do what all good devs would have done: 
 #include <chrono>
 using namespace std;
 
-int main() 
-{
-    std::cout << "Hello, World!" << std::endl;
-    std::this_thread::sleep_for(std::chrono::seconds(100));
-    return 0;
+int main() {
+  std::cout << "Hello, World!" << std::endl;
+  std::this_thread::sleep_for(std::chrono::seconds(100));
+  return 0;
 }
 ```
 **C++/CLI**
@@ -140,8 +139,8 @@ Once we have our interface, we can use it to enumerate all installed Runtimes wt
 result = ICLRMetaHost_EnumerateInstalledRuntimes(metahost, &runtime);
 
 if (result != S_OK){
-	fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
-	return result;
+  fprintf(stderr, "[!] EnumerateInstalledRuntimes() function failed (0x%x)\n", result);
+  return result;
 }
 ```
 
@@ -251,10 +250,7 @@ One very interesting thing I noticed was if I open the process in `ProcessHacker
 
 ![](./img/loader_under_process_hacker.png)
 
-One gaping problem in this project is that using this particular approach, we need the managed code to be run on the disk itself. A better way to do things would be to run things in-memory, but that's a problem for another time.
 
-## ETW: What the hell is even that?
-`Event Tracing For Windows`, aka ETW.
 ## Compilation
 To compile the sources, you can run the `compile.bat` script:
 ```powershell
