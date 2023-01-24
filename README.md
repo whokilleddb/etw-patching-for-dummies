@@ -280,6 +280,12 @@ Infact, we can write our own consumers, as you fill find [here](https://github.c
 
 Now the question is, how do we get around `ETW`? We cant let the defender know that red teamers are on the system, therefore, it's time to patch things up!
 
+## Patching ETW
+For the basics of ETW patching, I really recommend going through [Adam Chester's Blog](https://www.mdsec.co.uk/2020/03/hiding-your-net-etw/) which talks about patching the [EtwEventWrite](https://learn.microsoft.com/en-us/windows/win32/devnotes/etweventwrite) function. However, for our intents and purpose, we would be referring to this [Whiteknight Blog](https://whiteknightlabs.com/2021/12/11/bypassing-etw-for-fun-and-profit/) which goes one level deeper and patches the  `NtTraceEvent` syscall used by a lot of the logging utilities.
+
+![](./img/patched_etw.png)
+
+
 ## Compilation
 To compile the sources, you can run the `compile.bat` script:
 ```powershell
