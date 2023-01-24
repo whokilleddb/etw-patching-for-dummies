@@ -283,8 +283,31 @@ Now the question is, how do we get around `ETW`? We cant let the defender know t
 ## Patching ETW
 For the basics of ETW patching, I really recommend going through [Adam Chester's Blog](https://www.mdsec.co.uk/2020/03/hiding-your-net-etw/) which talks about patching the [EtwEventWrite](https://learn.microsoft.com/en-us/windows/win32/devnotes/etweventwrite) function. However, for our intents and purpose, we would be referring to this [Whiteknight Blog](https://whiteknightlabs.com/2021/12/11/bypassing-etw-for-fun-and-profit/) which goes one level deeper and patches the  `NtTraceEvent` syscall used by a lot of the logging utilities.
 
+The idea is to patch the `NtTraceEvent` function to return a value of 0 (`STATUS_SUCCESS`) indicates that the call was successful and the requested operation was completed. We overwrite the beginning of the function with:
+
+```asm
+xor rax, eax
+ret
+```
+
+You can add a `nop` sled just for the ✨razzle-dazzle✨ but overall this should cause the intended value to be returned to the caller without actually issuing the syscall to the kernel, indicating to the caller that the syscall was successful. A quick and dirty skeletal code to patch `NtTraceEvent` can be written as:
+
+```c
+DWORD _temp, oldprotect = 0;
+unsigned char patch_bytes[] = { 0x90, 0x90, 0x48, 0x31, 0xC0, 0xC3 };
+FARPROC  nt_trace_event_addr = GetProcAddress(LoadLibrary("ntdll"), "NtTraceEvent");
+VirtualProtect((LPVOID)nt_trace_event_addr, sizeof(patch_bytes), PAGE_EXECUTE_READWRITE, &oldprotect);
+memcpy(nt_trace_event_addr, patch_bytes, sizeof(patch_bytes));
+VirtualProtect((LPVOID)nt_trace_event_addr, sizeof(patch_bytes), oldprotect, &_temp);
+```
+
+A small hiccup which I faced during the this while drawing a parallels with `AMSI` patching is that back during patching `AMSI`, I could set the memory protection with `VirtualProtect()` as `PAGE_READWRITE` but doing so here somehow crashes the program with the error code `0xC0000005` aka `STATUS_ACCESS_VIOLATION` which I believe is protected (afterall, its a syscall) and needs to be executable and readable!
+ 
+Apart from that we should be easily able to patch things up. The `patcher.c` program has a more refined version of the PoC code and once compiled, we can use `WinDbg` to see the syscall being patched in real time.
+
 ![](./img/patched_etw.png)
 
+Thus, we successfully patched ETW at a syscall level. ETW patching is just one of the many things you can do to blind EDRs. As a begineer, I wanted to understand how `C#`, `.NET` and `ETW` all come in together in thw Windows landscape, and how we as red teamers can be one step ahead at all times. 
 
 ## Compilation
 To compile the sources, you can run the `compile.bat` script:
